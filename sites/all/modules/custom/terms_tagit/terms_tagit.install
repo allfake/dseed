@@ -1,0 +1,33 @@
+<?php
+/**
+ * @file
+ * Installation and uninstallation functions.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function terms_tagit_requirements($phase) {
+  $requirements = array();
+
+  if ($phase == 'runtime') {
+    $library = libraries_detect('jQuery-Tags-Input');
+
+    if (empty($library['installed'])) {
+      $requirements['tagsinput_js'] = array(
+        'title' => get_t('jQuery Tags Input Library'),
+        'severity' => REQUIREMENT_ERROR,
+        'description' => get_t('Please download and install the Tags Input library into %path', array('%path' => 'sites/all/libraries')),
+      );
+    }
+    else {
+      $requirements['tagsinput_js'] = array(
+        'title' => get_t('jQuery Tags Input Library'),
+        'severity' => REQUIREMENT_OK,
+        'value' => $library['version'],
+      );
+    }
+  }
+
+  return $requirements;
+}

@@ -1,0 +1,5 @@
+name = Terms TagIt
+description = Implements term references autocomplete fields to have tagit interactions.
+package = Fields
+dependencies[] = libraries (2.x)
+core = 7.x

@@ -1,0 +1,9 @@
+name = View Responsive Slides
+description = Provide jQuery Responsive Slides from http://responsive-slides.viljamis.com/
+core = 7.x
+package = Views
+
+files[] = views_responsive_slides.module
+files[] = theme/views_responsive_slides.theme.inc
+files[] = views_responsive_slides.views.inc
+files[] = views_responsive_slides_style_plugin.inc

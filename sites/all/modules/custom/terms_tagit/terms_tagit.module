@@ -1,0 +1,199 @@
+<?php
+/**
+ * @file
+ * Written by Jerry Low
+ * http://www.jerrylow.com
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function terms_tagit_menu() {
+  $items = array();
+
+  $items['autocomplete/terms-tagit/%'] = array(
+    'title' => 'Terms Tagit',
+    'description' => 'List of terms in json.',
+    'page callback' => 'terms_tagit_json_view',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+  );
+
+  return $items;
+}
+
+/**
+ * Create the json view.
+ */
+function terms_tagit_json_view($vocabulary) {
+  require_once drupal_get_path('module', 'terms_tagit').'/terms_tagit.inc';
+
+  $vid = terms_tagit_vid($vocabulary);
+
+  if (user_access('edit terms in ' . $vid)) {
+    if ($vid != NULL) {
+      $search = '';
+      if (isset($_GET['term'])) {
+        //$search = preg_replace('/[^-a-zA-Z0-9_]/', '', $_GET['term']);
+        $search = $_GET['term'];
+      }
+
+      $terms = taxonomy_get_tree($vid, 0, NULL, TRUE);
+      $terms = terms_tagit_terms($terms, $search);
+      drupal_json_output($terms);
+    }
+  }
+  else {
+    drupal_access_denied();
+  }
+}
+
+/**
+ * Implements hook_field_info_alter().
+ */
+function terms_tagit_field_info_alter(&$info) {
+  $settings = array(
+    'tagit_enable' => 0,
+    'tagit_autocomplete' => 0,
+    'tagit_autocomplete_url' => '',
+    'tagit_placeholder' => '',
+  );
+
+  if (isset($info['taxonomy_term_reference']['instance_settings'])) {
+    $info['taxonomy_term_reference']['instance_settings'] += $settings;
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function terms_tagit_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
+  require_once 'terms_tagit.inc';
+
+  if ($form['#field']['type'] == 'taxonomy_term_reference') {
+    $settings = $form['#instance']['settings'];
+
+    $tagit['tagit_settings'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('TagIt'),
+      '#collapsible' => TRUE,
+      '#collapsed' => empty($settings['tagit_enable']),
+      '#parents' => array('instance', 'settings'),
+      '#weight' => 10,
+    );
+
+    $tagit['tagit_settings']['tagit_enable'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable TagIt on this field'),
+      '#default_value' => (!empty($settings['tagit_enable'])) ? $settings['tagit_enable'] : 0,
+    );
+    $tagit['tagit_settings']['tagit_autocomplete'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable autocomplete (drop down of terms)'),
+      '#default_value' => (!empty($settings['tagit_autocomplete'])) ? $settings['tagit_autocomplete'] : 0,
+    );
+    $tagit['tagit_settings']['tagit_autocomplete_url'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Custom JSON URL'),
+      '#default_value' => (!empty($settings['tagit_autocomplete_url'])) ? $settings['tagit_autocomplete_url'] : '',
+      '#size' => 20,
+      '#maxlength' => 60,
+      '#element_validate' => array('terms_tagit_autocomplete_url_validate'),
+      '#description' => t('Load your own custom JSON list of terms. Must have "Enable autocomplete" enabled.'),
+    );
+    $tagit['tagit_settings']['tagit_placeholder'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Placeholder text'),
+      '#default_value' => (!empty($settings['tagit_placeholder'])) ? $settings['tagit_placeholder'] : 'Add terms',
+      '#size' => 20,
+      '#maxlength' => 60,
+      '#description' => t('Placeholder text before terms are populated. Enter a space if you want nothing.'),
+    );
+
+    if (empty($form['instance']['settings'])) {
+      $form['instance']['settings'] = $tagit;
+    }
+    else {
+      $form['instance']['settings'] += $tagit;
+    }
+  }
+}
+
+/**
+ * Implements hook_widget_form_alter().
+ */
+function terms_tagit_field_widget_form_alter(&$element, &$form_state, $context) {
+  $widget_type = $context['instance']['widget']['type'];
+  if ($widget_type == 'taxonomy_autocomplete') {
+    $widget_settings = $context['instance']['settings'];
+    if (!empty($widget_settings['tagit_enable'])) {
+      require_once 'terms_tagit.inc';
+
+      libraries_load('jQuery-Tags-Input');
+      drupal_add_library('system', 'ui.autocomplete');
+      drupal_add_js(drupal_get_path('module', 'terms_tagit') . '/js/terms_tagit.js');
+
+      $element['#attributes']['class'][] = 'terms-tagit';
+
+      if (!empty($widget_settings['tagit_placeholder'])) {
+        $element['#attributes']['data-placeholder'][] = t($widget_settings['tagit_placeholder']);
+      }
+
+      if (!empty($widget_settings['tagit_autocomplete'])) {
+        if (empty($widget_settings['tagit_autocomplete_url'])) {
+          $vocabulary = 'autocomplete/terms-tagit/' . terms_tagit_vocabulary($element['#field_name']);
+        }
+        else {
+          $vocabulary = $widget_settings['tagit_autocomplete_url'];
+        }
+        if (!empty($vocabulary)) {
+          $element['#attributes']['data-autocomplete'][] = url($vocabulary);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_libraries_info().
+ */
+function terms_tagit_libraries_info() {
+  $libraries['jQuery-Tags-Input'] = array(
+    'name' => 'jQuery Tags Input',
+    'vendor url' => 'https://github.com/xoxco/jQuery-Tags-Input',
+    'download url' => 'https://github.com/xoxco/jQuery-Tags-Input.git',
+    'version' => 1,
+    'files' => array(
+      'js' => array(
+        'jquery.tagsinput.js',
+      ),
+      'css' => array(
+        'jquery.tagsinput.css',
+      ),
+    ),
+    'variants' => array(
+      'minified' => array(
+        'files' => array(
+          'js' => array(
+            'jquery.tagsinput.min.js',
+          ),
+          'css' => array(
+            'jquery.tagsinput.css',
+          ),
+        ),
+      ),
+      'source' => array(
+        'files' => array(
+          'js' => array(
+            'jquery.tagsinput.js',
+          ),
+          'css' => array(
+            'jquery.tagsinput.css',
+          ),
+        ),
+      ),
+    ),
+  );
+
+  return $libraries;
+}

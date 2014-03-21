@@ -1,0 +1,4 @@
+References 7.x-1.0-dev
+========================
+
+Initial beta release of Terms TagIt.
